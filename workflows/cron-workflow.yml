@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: basic-cron-workflow
+spec:
+  #  run every 5 minutes
+  schedule: "*/5 * * * *"
+  workflowSpec:
+    entrypoint: basic-pipeline
+    templates:
+    # sys container for messages
+    - name: msg-container
+      inputs:
+        parameters:
+          # define message to print
+          - name: message
+      container:
+        # resource request
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 1
+        imagePullPolicy: Always
+        # docker image url
+        image: 171649450587.dkr.ecr.eu-west-1.amazonaws.com/<repo_name>:v0.1.0
+        # command to run
+        command: ["bash", "-c"]
+        args:
+          [
+            "echo {{inputs.parameters.message}}"
+          ]
+    - name: pipeline-container
+      container:
+        # resource request
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 1
+        imagePullPolicy: Always
+        # docker image url
+        image: 171649450587.dkr.ecr.eu-west-1.amazonaws.com/<repo_name>:v0.1.0
+        # command to run
+        command: ["bash", "-c"]
+        args:
+          [
+            "python3 src/sample_pipeline.py",
+          ]
+        
+    # basic pipeline dag
+    - name: basic-pipeline
+      dag:
+        tasks:
+          # Start-up
+          - name: start-process
+            template: msg-container
+            arguments:
+              parameters:
+                - name: message
+                  value: Starting-Up
+          # run the pipeline
+          - name: pipeline-process
+            template: pipeline-container
+            depends: start-process
+          # Finish-up
+          - name: finish-process
+            template: msg-container
+            arguments:
+              parameters:
+                - name: message
+                  value: Finishing-Up
+            depends: pipeline-process
+          
